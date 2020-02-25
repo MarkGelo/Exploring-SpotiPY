@@ -58,6 +58,15 @@ def inSaved(id):
                 return True
     return False
 
+# returns list of saved songs
+def savedToList():
+    out = []
+    with open('savedSongs.csv', 'r') as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            out.append(row['id'])
+    return out
+
 # output saved songs id to a csv file
 # check if it ouputs all saved songs
 def writeSaved():
@@ -102,14 +111,27 @@ def showPlaylists():
         playlists = sp.current_user_playlists(offset = i) # limit default 50 so need offset
         for playlist in playlists['items']:
             print(playlist['name'])
+            print('\t Total Songs: {}'.format(playlist['tracks']['total']))
+            print('\t Saved Songs: {}'.format(numSavedSongs(playlist['name'])))
             i += 1
     print()
+
+# get number of saved songs already in playlist specified
+def numSavedSongs(name):
+    savedSongs = savedToList()
+    playlistSongs = playlistToList(name)
+    savedInPlaylist = [x for x in playlistSongs if x in savedSongs]
+    return len(savedInPlaylist)
+    raise NotImplementedError
 
 # keeps some saved songs
 # missing 1 song from total of 'finalremoved' songs
 # sometimes results in an error in adding songs
 # think its cuz either the song is removed from spotify but remains in the library but cant add
 # or theres a foreign character and results in wrong/invalid id
+
+# update playlist method doesnt leave any saved songs
+# maybe could just use that in combination with this, or just outright use that somehow
 def copyPlaylists(name, description = "", remove = True, public = True):
     playlists = sp.user_playlists(username) # max 50 playlists - need to make another method just to get user playlists
     playlistToCopy = []
@@ -187,13 +209,41 @@ def currentPlaylistsToList():
             i += 1
     return out
 
-def tracksToList(tracks, listing):
-    for songs in tracks:
-        print(songs['track']['id'])
-
+# removes already liked songs from the playlist
+# no leftover liked songs
 def updatePlaylist(playlist):
-    #user_playlist_remove_all_occurrences_of_tracks(user, playlist_id, tracks, snapshot_id=None)
-    raise NotImplementedError
+    savedSongs = savedToList()
+    songsInPlaylist = playlistToList(playlist)
+    toRemove = [x for x in songsInPlaylist if x in savedSongs]
+    listss = []
+    lists = []
+    for i in range(len(toRemove)):
+        if (i != 0 and i % 99 == 0): # think 100 is limit hmm 99 looks better
+            i == 0
+            listss.append(lists)
+            lists = []
+        lists.append(toRemove[i])
+    listss.append(lists) # append the last list
+
+    playlistID = getUserPlaylistID(playlist)
+    for songsToRemove in listss:
+        sp.user_playlist_remove_all_occurrences_of_tracks(username, playlistID, songsToRemove, snapshot_id=None)
+
+def playlistToList(playlist):
+    out = []
+    i = 0
+    # y error when i add the while loop and totalsongs
+    totalSongs = sp.user_playlist(username, getUserPlaylistID(playlist))['tracks']['total']
+    while i < totalSongs:
+        playlistSongs = sp.user_playlist_tracks(username, getUserPlaylistID(playlist), offset = i)
+        for songs in playlistSongs['items']:
+            try: # dont do this, think its cuz foreign lang on name
+                out.append(songs['track']['id'])
+                i += 1
+            except:
+                print('u suck, fix this')
+                i += 1
+    return out
 
 def start():
     print('Some things you can do...')
@@ -226,7 +276,8 @@ def start():
                 public = True
             copyPlaylists(name, description, remove, public)
         elif(choice == '4'):
-            updatePlaylist()
+            playlist = input('Input the playlist you want to remove saved songs ')
+            updatePlaylist(playlist)
         elif(choice == 'S'):
             writeSaved()
         else:
