@@ -124,20 +124,12 @@ def numSavedSongs(name):
     return len(savedInPlaylist)
     raise NotImplementedError
 
-# keeps some saved songs
-# missing 1 song from total of 'finalremoved' songs
-# sometimes results in an error in adding songs
-# think its cuz either the song is removed from spotify but remains in the library but cant add
-# or theres a foreign character and results in wrong/invalid id
-
-# update playlist method doesnt leave any saved songs
-# maybe could just use that in combination with this, or just outright use that somehow
+# copys playlists to new playlist with option to remove already liked songs
 def copyPlaylists(name, description = "", remove = True, public = True):
     playlists = sp.user_playlists(username) # max 50 playlists - need to make another method just to get user playlists
-    playlistToCopy = []
-    tracksToCopy = []
     toCopy = []
     currentPlaylists = currentPlaylistsToList()
+    # check if what user typed is actually a playlist they have saved
     while True:
         print('Type in name of saved Playlist name to copy')
         print('Type ~ to stop')
@@ -146,23 +138,6 @@ def copyPlaylists(name, description = "", remove = True, public = True):
             break
         else:
             toCopy.append(user)
-
-    playlistToCopy = [x for x in toCopy if x in currentPlaylists]
-
-    for playlist in playlists['items']:
-        i = 0
-        if playlist['name'] in playlistToCopy:
-            totalSongs = sp.user_playlist(username, playlist['id'])['tracks']['total']
-            while(i < totalSongs):
-                tracks = sp.user_playlist_tracks(username, playlist['id'], offset = i)
-                track = tracks['items']
-                for songs in track:
-                    tracksToCopy.append(songs['track']['id'])
-                    i += 1
-    removedLikedSongs = [x for x in tracksToCopy if not inSaved(x)]
-    finalTracks = list(set(removedLikedSongs)) # removes duplicates
-    # make playlist
-
     # check if name is taken - just so easier to navigate
     while name in currentPlaylists:
         name = input('Please type a new unique name for ur new playlist ')
@@ -173,18 +148,23 @@ def copyPlaylists(name, description = "", remove = True, public = True):
     if(newPlaylistID is False):
         print('Unable to get new Playlist ID')
 
-    # can only add 100 per request
-    # i think im missing one song from this iteration.... hmmm
-    current = []
-    while(i < len(finalTracks)):
-        current.append(finalTracks[i])
-        if len(current) == 100:
-            sp.user_playlist_add_tracks(username, newPlaylistID, current)
-            current = []
-        elif i == len(finalTracks) - 1:
-            sp.user_playlist_add_tracks(username, newPlaylistID, current)
-            current = []
-        i += 1
+    # copys songs in playlists to new playlist
+    for playlist in toCopy:
+        finalTracks = playlistToList(playlist)
+        i = 0
+        current = []
+        while(i < len(finalTracks)):
+            current.append(finalTracks[i])
+            if len(current) == 100:
+                sp.user_playlist_add_tracks(username, newPlaylistID, current)
+                current = []
+            elif i == len(finalTracks) - 1:
+                sp.user_playlist_add_tracks(username, newPlaylistID, current)
+                current = []
+            i += 1
+    # update new playlist to remove already liked songs
+    if remove:
+        updatePlaylist(name)
     
 def getUserPlaylistID(name):
     playlists = sp.current_user_playlists()
@@ -229,20 +209,25 @@ def updatePlaylist(playlist):
     for songsToRemove in listss:
         sp.user_playlist_remove_all_occurrences_of_tracks(username, playlistID, songsToRemove, snapshot_id=None)
 
-def playlistToList(playlist):
+def playlistToList(*playlist):
     out = []
     i = 0
     # y error when i add the while loop and totalsongs
-    totalSongs = sp.user_playlist(username, getUserPlaylistID(playlist))['tracks']['total']
-    while i < totalSongs:
-        playlistSongs = sp.user_playlist_tracks(username, getUserPlaylistID(playlist), offset = i)
-        for songs in playlistSongs['items']:
-            try: # dont do this, think its cuz foreign lang on name
-                out.append(songs['track']['id'])
-                i += 1
-            except:
-                print('u suck, fix this')
-                i += 1
+    for playlists in playlist:
+        totalSongs = sp.user_playlist(username, getUserPlaylistID(playlists))['tracks']['total']
+        while i < totalSongs:
+            playlistSongs = sp.user_playlist_tracks(username, getUserPlaylistID(playlists), offset = i)
+            for songs in playlistSongs['items']:
+                try: # dont do this, think its cuz foreign lang on name
+                    if songs['track']['id'] is None:
+                        pass
+                    else:
+                        out.append(songs['track']['id'])
+                    i += 1
+                except:
+                    # maybe spotify removed this songs, which is why error... hmmmm
+                    print('u suck, fix this')
+                    i += 1
     return out
 
 def start():
@@ -287,3 +272,4 @@ def start():
 # starts the program
 start()
 
+# some saved songs dont update - not in csv even after saving - have to unlike and then like again then save for it to update
