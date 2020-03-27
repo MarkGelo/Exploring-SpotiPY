@@ -148,20 +148,27 @@ def copyPlaylists(name, description = "", remove = True, public = True):
     if(newPlaylistID is False):
         print('Unable to get new Playlist ID')
 
-    # copys songs in playlists to new playlist
+    # put songs in list and remove duplicates
+    finalTracks = []
     for playlist in toCopy:
-        finalTracks = playlistToList(playlist)
-        i = 0
-        current = []
-        while(i < len(finalTracks)):
-            current.append(finalTracks[i])
-            if len(current) == 100:
-                sp.user_playlist_add_tracks(username, newPlaylistID, current)
-                current = []
-            elif i == len(finalTracks) - 1:
-                sp.user_playlist_add_tracks(username, newPlaylistID, current)
-                current = []
-            i += 1
+        currentTracks = playlistToList(playlist)
+        notDuplicate = [x for x in currentTracks if x not in finalTracks]
+        # copy notDuplicate to finalTracks
+        for x in notDuplicate:
+            finalTracks.append(x)
+    i = 0
+    current = []
+    # put songs in playlist
+    while(i < len(finalTracks)):
+        current.append(finalTracks[i])
+        if len(current) == 100:
+            sp.user_playlist_add_tracks(username, newPlaylistID, current)
+            current = []
+        elif i == len(finalTracks) - 1:
+            sp.user_playlist_add_tracks(username, newPlaylistID, current)
+            current = []
+        i += 1
+        
     # update new playlist to remove already liked songs
     if remove:
         updatePlaylist(name)
@@ -270,6 +277,7 @@ def start():
             break
 
 # starts the program
-start()
+if __name__ == "__main__":
+    start()
 
 # some saved songs dont update - not in csv even after saving - have to unlike and then like again then save for it to update
