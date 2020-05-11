@@ -230,7 +230,6 @@ def playlistToList(*playlist):
         while i < totalSongs:
             playlistSongs = sp.user_playlist_tracks(username, getUserPlaylistID(playlists), offset = i)
             for songs in playlistSongs['items']:
-                print(songs)
                 try: # dont do this, think its cuz foreign lang on name
                     if songs['track']['id'] is None:
                         pass
