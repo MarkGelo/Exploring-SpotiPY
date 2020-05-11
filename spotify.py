@@ -88,8 +88,8 @@ def showFunctions():
         0 - Exit
         1 - Show user info
         2 - Show playlists
-        3 - Copy a playlist (name, description, remove saved songs, public or private)
-        4 - Update a playlist
+        3 - Copy a playlist
+        4 - Remove already liked songs in a playlist
         5 - Playlist generator
         S - Save liked songs to csv
         '''
@@ -272,6 +272,7 @@ def start():
                 public = False
             else: # default
                 public = True
+            # yo am i stupid, but why can it reference the remove and public, if its inside the if statemtn
             copyPlaylists(name, description, remove, public)
         elif(choice == '4'):
             playlist = input('Input the playlist you want to remove saved songs ')
@@ -327,10 +328,12 @@ def playlistGenerator():
             
             # GET GENRE
             # but how tho
+            # web scraping? 
+            # or machine learning pogu but have to scrape for audio lmao or could use spotifys api full audio analysis to learn from
             # https://towardsdatascience.com/music-genre-prediction-with-spotifys-audio-features-8a2c81f1a22e
     
     # GET AUDIO STATS
-    # hardcoded but whatev
+    # https://developer.spotify.com/documentation/web-api/reference/tracks/get-audio-features/
     characteristics = ['Acousticness', 'Danceability', 'Energy', 'Instrumentalness', 'Loudness', 'Valence', 'Tempo']
     for characteristic in characteristics:
         generated['Audio'][characteristic] = {} # adds another dict layer into dict
@@ -352,7 +355,6 @@ def playlistGenerator():
                 else:
                     generated['Audio'][characteristics[i]][charVals[i]] = [song['id']]
 
-            
     # iterate over dictionary and checking lengths of lists and display to user
     for types in generated:
         print('{}: '.format(types))
@@ -443,3 +445,4 @@ if __name__ == "__main__":
     start()
 
 # some saved songs dont update - not in csv even after saving - have to unlike and then like again then save for it to update
+# SOME SONGS ARE UNAVAILABLE, gREYED OUT ON SPOTIFY, NOT AVAILABLE IN US?? IS THAT WHY NOT ALL SONGS GET SAVED TO A PLAYLIST OR WHATEV??
