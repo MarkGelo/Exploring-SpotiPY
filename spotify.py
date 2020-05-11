@@ -4,6 +4,8 @@ import csv
 import os
 from spotipy.oauth2 import SpotifyClientCredentials
 import spotipy.util as util
+import math
+from datetime import date
 
 # auto populated if put into a csv file with these
 cid ='' # Client ID
@@ -88,6 +90,7 @@ def showFunctions():
         2 - Show playlists
         3 - Copy a playlist (name, description, remove saved songs, public or private)
         4 - Update a playlist
+        5 - Playlist generator
         S - Save liked songs to csv
         '''
     print(out)
@@ -147,6 +150,7 @@ def copyPlaylists(name, description = "", remove = True, public = True):
     newPlaylistID = getUserPlaylistID(name)
     if(newPlaylistID is False):
         print('Unable to get new Playlist ID')
+        return
 
     # put songs in list and remove duplicates
     finalTracks = []
@@ -184,6 +188,7 @@ def getUserPlaylistID(name):
                 return playlist['id']
             i += 1
     return False
+    
 def currentPlaylistsToList():
     out = []
     playlists = sp.current_user_playlists()
@@ -225,6 +230,7 @@ def playlistToList(*playlist):
         while i < totalSongs:
             playlistSongs = sp.user_playlist_tracks(username, getUserPlaylistID(playlists), offset = i)
             for songs in playlistSongs['items']:
+                print(songs)
                 try: # dont do this, think its cuz foreign lang on name
                     if songs['track']['id'] is None:
                         pass
@@ -270,11 +276,167 @@ def start():
         elif(choice == '4'):
             playlist = input('Input the playlist you want to remove saved songs ')
             updatePlaylist(playlist)
+        elif(choice == '5'):
+            playlistGenerator()
         elif(choice == 'S'):
             writeSaved()
         else:
             print('Invalid choice dimwit')
             break
+def divideList(arr, n): # n is the size to divide by, n = 50 makes teh arr into 50 size arrays in a list
+    for i in range(0, len(arr), n):
+        yield arr[i : i + n]
+
+def roundDownToTens(x):
+    return int(math.floor(x / 10.0)) * 10
+
+def roundDown(n, decimals = 0): # decimals is where to round down to, if 0, then just integer, 2.4 -> 2, if 1, then 1.37 -> 1.3
+    multiplier = 10 ** decimals
+    return math.floor(n * multiplier) / multiplier
+
+def playlistGenerator():
+    generated = {"Year" : {}, "Genre" : {}, "Popularity" : {}, "Audio" : {}}
+    description = []
+    savedSongs = savedToList() # put all ids of saved songs in this var
+
+    songs = divideList(savedSongs, 50) # 50 max ids
+    for listsOfSongs in songs:
+        temp1 = sp.tracks(listsOfSongs) # temp var of tracks
+        for track in temp1['tracks']:
+            # GET YEARS
+            year = 0 # unknown default if somehow couldnt parse or whatev
+            # parses release date and rounds down to 10s
+            if(track['album']['release_date_precision'] == 'year'):
+                year = roundDownToTens(int(track['album']['release_date']))
+            elif(track['album']['release_date_precision'] == 'day' or track['album']['release_date_precision'] == 'month'):
+                year = roundDownToTens(int(track['album']['release_date'][:4])) # get first four characters, which is the year
+            
+            # adds to dict
+            if year in generated['Year']:
+                generated['Year'][year].append(track['id'])
+            else:
+                generated['Year'][year] = [track['id']]
+
+            # GET POPULARITY
+            pop = roundDownToTens(int(track['popularity']))
+            # adds to dict
+            if pop in generated['Popularity']: # check if range of popularity is in dictionary already, ex 10s is 10 - 20 pop
+                generated['Popularity'][pop].append(track['id']) # if its already there, appends to the current list
+            else: # if not , then makes one and with a list
+                generated['Popularity'][pop] = [track['id']]
+            
+            # GET GENRE
+            # but how tho
+            # https://towardsdatascience.com/music-genre-prediction-with-spotifys-audio-features-8a2c81f1a22e
+    
+    # GET AUDIO STATS
+    # hardcoded but whatev
+    characteristics = ['Acousticness', 'Danceability', 'Energy', 'Instrumentalness', 'Loudness', 'Valence', 'Tempo']
+    for characteristic in characteristics:
+        generated['Audio'][characteristic] = {} # adds another dict layer into dict
+    audioSongs = divideList(savedSongs, 100)
+    for listOfSongs in audioSongs:
+        temp1 = sp.audio_features(listOfSongs)
+        for song in temp1:
+            charVals = []
+            charVals.append(roundDown(song['acousticness'], 1))
+            charVals.append(roundDown(song['danceability'], 1))
+            charVals.append(roundDown(song['energy'], 1))
+            charVals.append(roundDown(song['instrumentalness'], 1))
+            charVals.append(roundDown(song['loudness'], 0))
+            charVals.append(roundDown(song['valence'], 1))
+            charVals.append(roundDown(song['tempo'], -1))
+            for i in range(0, len(characteristics)):
+                if charVals[i] in generated['Audio'][characteristics[i]]:
+                    generated['Audio'][characteristics[i]][charVals[i]].append(song['id'])
+                else:
+                    generated['Audio'][characteristics[i]][charVals[i]] = [song['id']]
+
+            
+    # iterate over dictionary and checking lengths of lists and display to user
+    for types in generated:
+        print('{}: '.format(types))
+        for subCat in generated[types]:
+            # take out categories that dont have 50+ or more songs
+            if isinstance(subCat, str):
+                print('\t{}:'.format(subCat))
+                for subCat1 in generated[types][subCat]:
+                    amtOfSongs = len(generated[types][subCat][subCat1])
+                    if(amtOfSongs >= 50):
+                        print('\t\t{} - {} songs'.format(subCat1, amtOfSongs))
+            else:
+                amtOfSongs = len(generated[types][subCat])
+                if(amtOfSongs >= 50):
+                    print('\t{} - {} songs'.format(subCat, amtOfSongs))
+        print() # skip a line
+    # ask user for a playlist they want, or multiple, and add to acc
+    toAdd = []
+    userInput = 'yes' # default
+    while(userInput == 'yes'):
+        userToAdd = input('Which category? Ex. Year 2020 or Popularity 70 or Audio Acousticness 0.6 or Audio Acousticness x < 0.2 or Audio Acousticness 0.4 < x < 0.7 \n')
+        keys = userToAdd.split()
+        if(keys[0] == 'Year'):
+            toAdd.extend(generated[keys[0]][int(keys[1])])
+            description.append('Year {}'.format(int(keys[1])))
+        elif(keys[0] == 'Genre'):
+            toAdd.extend(generated[keys[0]][keys[1]])
+            description.append(keys[1])
+        elif(keys[0] == 'Popularity'):
+            toAdd.extend(generated[keys[0]][int(keys[1])])
+            description.append('Popularity {}'.format(int(keys[1])))
+        elif(keys[0] == 'Audio'):
+            #keys 2 and above cna be int or string - 0.2 or x < 0.2 or 0.2 < x < 0.3
+            if len(keys) == 3: # Audio Tempo 0.2
+                toAdd.extend(generated[keys[0]][keys[1]][float(keys[2])])
+                description.append('{} {}'.format(keys[1], float(keys[2])))
+            elif len(keys) == 5: # Audio Tempo x < 0.2
+                #iterate over generated[keys[0]][keys[1]] and if lessthan or greater than keys[4]
+                # then add
+                for numbers in generated[keys[0]][keys[1]]:
+                    if keys[3] == '<':
+                        if numbers < float(keys[4]):
+                            toAdd.extend(generated[keys[0]][keys[1]][numbers])
+                            description.append('{} {}'.format(keys[1], numbers))
+                    elif keys[3] == '>':
+                        if numbers > float(keys[4]):
+                            toAdd.extend(generated[keys[0]][keys[1]][numbers])
+                            description.append('{} {}'.format(keys[1], numbers))
+                    else:
+                        return
+            elif len(keys) == 7: # Audio Tempo 0.3 < x < 0.5
+                for numbers in generated[keys[0]][keys[1]]:
+                    # assume both are < cuz otherwise stupid
+                    if keys[3] == keys[5] and keys[5] == '<':
+                        if numbers < float(keys[6]) and numbers > float(keys[2]):
+                            toAdd.extend(generated[keys[0]][keys[1]][numbers])
+                            description.append('{} {}'.format(keys[1], numbers))
+                    else:
+                        print('Wrong format, left to right dumbo, _ < _ < _ -> format like 0.3 < x < 0.5')
+        userInput = input('Add more? (yes or no) ')
+
+    #remove duplicates
+    removedDuplicates = list(dict.fromkeys(toAdd)) # makes a dictionary of the ids, so removes duplicates
+    
+    title = input('Name of the playlist: ')
+    today = date.today()
+    # dd/mm/YY
+    dateToday = today.strftime("%d/%m/%Y")
+    description.append('Created on {}'.format(dateToday))
+    outDescription = ', '.join(description)
+    # create a playlist and add these songs
+    sp.user_playlist_create(username, title, True, outDescription)
+
+    # get new playlist id
+    newPlaylistID = getUserPlaylistID(title)
+    if(newPlaylistID is False):
+        print('Unable to get new Playlist ID')
+        return
+    
+    addingSongs = divideList(removedDuplicates, 100) # divide to size 100, lists
+    # add songs to playlist
+    for lists in addingSongs:
+        sp.user_playlist_add_tracks(username, newPlaylistID, lists)
+
 
 # starts the program
 if __name__ == "__main__":
