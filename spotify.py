@@ -400,10 +400,10 @@ def playlistGenerator():
 
                 for numbers in generated[keys[0]][keys[1]]:
                     if keys[3] == '<':
-                        if numbers < float(keys[4]):
+                        if numbers <= float(keys[4]):
                             toAdd.extend(generated[keys[0]][keys[1]][numbers])
                     elif keys[3] == '>':
-                        if numbers > float(keys[4]):
+                        if numbers >= float(keys[4]):
                             toAdd.extend(generated[keys[0]][keys[1]][numbers])
                     else:
                         return
@@ -412,7 +412,7 @@ def playlistGenerator():
                 for numbers in generated[keys[0]][keys[1]]:
                     # assume both are < cuz otherwise stupid
                     if keys[3] == keys[5] and keys[5] == '<':
-                        if numbers < float(keys[6]) and numbers > float(keys[2]):
+                        if numbers <= float(keys[6]) and numbers >= float(keys[2]):
                             toAdd.extend(generated[keys[0]][keys[1]][numbers])
                     else:
                         print('Wrong format, left to right dumbo, _ < _ < _ -> format like 0.3 < x < 0.5')
