@@ -393,35 +393,29 @@ def playlistGenerator():
             elif len(keys) == 5: # Audio Tempo x < 0.2
                 #iterate over generated[keys[0]][keys[1]] and if lessthan or greater than keys[4]
                 # then add
-                toAddToDesc = keys[1]
-                toAddToDesc += ': '
+                if keys[3] == '<':
+                    description.append('{} less than {}'.format(keys[1], float(keys[4])))
+                else:
+                    description.append('{} greater than {}'.format(keys[1], float(keys[4])))
+
                 for numbers in generated[keys[0]][keys[1]]:
                     if keys[3] == '<':
                         if numbers < float(keys[4]):
                             toAdd.extend(generated[keys[0]][keys[1]][numbers])
-                            toAddToDesc += '{} '.format(numbers)
-                            # description.append('{} {}'.format(keys[1], numbers))
                     elif keys[3] == '>':
                         if numbers > float(keys[4]):
                             toAdd.extend(generated[keys[0]][keys[1]][numbers])
-                            toAddToDesc += '{} '.format(numbers)
-                            # description.append('{} {}'.format(keys[1], numbers))
                     else:
                         return
-                description.append(toAddToDesc)
             elif len(keys) == 7: # Audio Tempo 0.3 < x < 0.5
-                toAddToDesc = keys[1]
-                toAddToDesc += ': '
+                description.append('{} ({}, {})'.format(keys[1], keys[2], keys[6]))
                 for numbers in generated[keys[0]][keys[1]]:
                     # assume both are < cuz otherwise stupid
                     if keys[3] == keys[5] and keys[5] == '<':
                         if numbers < float(keys[6]) and numbers > float(keys[2]):
                             toAdd.extend(generated[keys[0]][keys[1]][numbers])
-                            toAddToDesc += '{} '.format(numbers)
-                            # description.append('{} {}'.format(keys[1], numbers))
                     else:
                         print('Wrong format, left to right dumbo, _ < _ < _ -> format like 0.3 < x < 0.5')
-                description.append(toAddToDesc)
         userInput = input('Add more? (yes or no) ')
 
     #remove duplicates
