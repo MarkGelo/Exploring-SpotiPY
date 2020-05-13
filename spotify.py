@@ -6,6 +6,7 @@ from spotipy.oauth2 import SpotifyClientCredentials
 import spotipy.util as util
 import math
 from datetime import date
+import time
 
 # auto populated if put into a csv file with these
 cid ='' # Client ID
@@ -516,6 +517,7 @@ def update_basic_playlists(generated, dateToday): # only updates 60s - 00s and u
     # update description
     sp.user_playlist_change_details(username, sixties, description = 'Updated on {}'.format(dateToday))
     # UPDATE 70s
+    time.sleep(6) # sleep 6 seconds
     seventies = getUserPlaylistID('70s')
     if seventies is False:
         print('Unable to get playlist ID')
@@ -527,6 +529,7 @@ def update_basic_playlists(generated, dateToday): # only updates 60s - 00s and u
         sp.user_playlist_add_tracks(username, seventies, songs)
     sp.user_playlist_change_details(username, seventies, description = 'Updated on {}'.format(dateToday))
     # UPDATE 80s
+    time.sleep(6) # sleep 6 seconds
     eighties = getUserPlaylistID('80s')
     if eighties is False:
         print('Unable to get playlist ID')
@@ -538,6 +541,7 @@ def update_basic_playlists(generated, dateToday): # only updates 60s - 00s and u
         sp.user_playlist_add_tracks(username, eighties, songs)
     sp.user_playlist_change_details(username, eighties, description = 'Updated on {}'.format(dateToday))
     # UPDATE 90s
+    time.sleep(6) # sleep 6 seconds
     nineties = getUserPlaylistID('90s')
     if nineties is False:
         print('Unable to get playlist ID')
@@ -549,6 +553,7 @@ def update_basic_playlists(generated, dateToday): # only updates 60s - 00s and u
         sp.user_playlist_add_tracks(username, nineties, songs)
     sp.user_playlist_change_details(username, nineties, description = 'Updated on {}'.format(dateToday))
     # UPDATE 00s
+    time.sleep(6) # sleep 6 seconds
     two = getUserPlaylistID('00s')
     if two is False:
         print('Unable to get playlist ID')
@@ -560,6 +565,7 @@ def update_basic_playlists(generated, dateToday): # only updates 60s - 00s and u
         sp.user_playlist_add_tracks(username, two, songs)
     sp.user_playlist_change_details(username, two, description = 'Updated on {}'.format(dateToday))
     # UPDATE Underrated? - popularities 10s and 20s
+    time.sleep(6) # sleep 6 seconds
     underrated = getUserPlaylistID('Underrated?')
     if underrated is False:
         print('Unable to get playlist ID')
@@ -575,6 +581,7 @@ def update_basic_playlists(generated, dateToday): # only updates 60s - 00s and u
     sp.user_playlist_change_details(username, underrated, 
                                     description = 'Spotify gives these a 10-39 on popularity -- Updated on {}'.format(dateToday))
     # UPDATE Unknown?
+    time.sleep(6) # sleep 6 seconds
     unknown = getUserPlaylistID('Unknown?')
     if unknown is False:
         print('Unable to get playlist ID')
@@ -588,17 +595,145 @@ def update_basic_playlists(generated, dateToday): # only updates 60s - 00s and u
                                     description = 'Spotify gives these a 0-9 on popularity -- Updated on {}'.format(dateToday))
 
 def update_characteristic_playlists(generated, dateToday):
-    pass
-
+    # UPDATE Quiet? - <= -17db
+    quiet = getUserPlaylistID('Quiet?')
+    if quiet is False:
+        print('Unable to get playlist ID')
+        # return an error
+        exit()
+    songsToAdd = []
+    for numbers in generated['Audio']['Loudness']:
+        if numbers <= -17:
+            songsToAdd.extend(generated['Audio']['Loudness'][numbers])
+    toAdd = divideList(songsToAdd, 100)
+    sp.user_playlist_replace_tracks(username, quiet, []) # clears playlist
+    for songs in toAdd:
+        sp.user_playlist_add_tracks(username, quiet, songs)
+    # if its characteristic < x  ----- the x should be added 1, cuz of the rounding down when input to dictionary
+    sp.user_playlist_change_details(username, quiet, 
+                                    description = 'Loudness < -16.0 -- Updated on {}'.format(dateToday))
+    # UPDATE Danceable? >= 0.8
+    time.sleep(6) # sleep 6 seconds
+    danceable = getUserPlaylistID('Danceable?')
+    if danceable is False:
+        print('Unable to get playlist ID')
+        # return an error
+        exit()
+    songsToAdd = []
+    for numbers in generated['Audio']['Danceability']:
+        if numbers >= 0.8:
+            songsToAdd.extend(generated['Audio']['Danceability'][numbers])
+    toAdd = divideList(songsToAdd, 100)
+    sp.user_playlist_replace_tracks(username, danceable, []) # clears playlist
+    for songs in toAdd:
+        sp.user_playlist_add_tracks(username, danceable, songs)
+    sp.user_playlist_change_details(username, danceable, 
+                                    description = 'Danceability >= 0.8 -- Updated on {}'.format(dateToday))
+    # UPDATE Low Energy <= 0.2
+    time.sleep(6) # sleep 6 seconds
+    lowEnergy = getUserPlaylistID('Low Energy?')
+    if lowEnergy is False:
+        print('Unable to get playlistID')
+        # return an error
+        exit()
+    songsToAdd = []
+    for numbers in generated['Audio']['Energy']:
+        if numbers <= 0.2:
+            songsToAdd.extend(generated['Audio']['Energy'][numbers])
+    toAdd = divideList(songsToAdd, 100)
+    sp.user_playlist_replace_tracks(username, lowEnergy, []) # clear playlist
+    for songs in toAdd:
+        sp.user_playlist_add_tracks(username, lowEnergy, songs)
+    sp.user_playlist_change_details(username, lowEnergy, 
+                                    description = 'Energy < 0.3 -- Updated on {}'.format(dateToday))
+    # UPDATE High Energy? >= 0.9
+    time.sleep(6) # sleep 6 seconds
+    highEnergy = getUserPlaylistID('High Energy?')
+    if highEnergy is False:
+        print('Unable to get playlist ID')
+        # return error
+        exit()
+    songsToAdd = []
+    for numbers in generated['Audio']['Energy']:
+        if numbers >= 0.9:
+            songsToAdd.extend(generated['Audio']['Energy'][numbers])
+    toAdd = divideList(songsToAdd, 100)
+    sp.user_playlist_replace_tracks(username, highEnergy, []) # clears playlist
+    for songs in toAdd:
+        sp.user_playlist_add_tracks(username, highEnergy, songs)
+    sp.user_playlist_change_details(username, highEnergy, 
+                                    description = 'Energy >= 0.9 -- Updated on {}'.format(dateToday))
+    # UPDATE No Vocals? >= 0.7
+    time.sleep(6) # sleep 6 seconds
+    noVocals = getUserPlaylistID('No Vocals?')
+    if noVocals is False:
+        print('Unable to get playlist ID')
+        # return an error
+        exit()
+    songsToAdd = []
+    for numbers in generated['Audio']['Instrumentalness']:
+        if numbers >= 0.7:
+            songsToAdd.extend(generated['Audio']['Instrumentalness'][numbers])
+    toAdd = divideList(songsToAdd, 100)
+    sp.user_playlist_replace_tracks(username, noVocals, []) # clears playlist
+    for songs in toAdd:
+        sp.user_playlist_add_tracks(username, noVocals, songs)
+    sp.user_playlist_change_details(username, noVocals, 
+                                    description = 'Instrumentalness >= 0.7 -- Updated on {}'.format(dateToday))
+    # UPDATE High Tempo? >= 150
+    time.sleep(6) # sleep 6 seconds
+    highTempo = getUserPlaylistID('High Tempo?')
+    if highTempo is False:
+        print('Unable to get playlist ID')
+        # return an error
+        exit()
+    songsToAdd = []
+    for numbers in generated['Audio']['Tempo']:
+        if numbers >= 150:
+            songsToAdd.extend(generated['Audio']['Tempo'][numbers])
+    toAdd = divideList(songsToAdd, 100)
+    sp.user_playlist_replace_tracks(username, highTempo, []) # clear playlist
+    for songs in toAdd:
+        sp.user_playlist_add_tracks(username, highTempo, songs)
+    sp.user_playlist_change_details(username, highTempo, 
+                                    description = 'Tempo >= 150 -- Updated on {}'.format(dateToday))
+    # UPDATE Sad? <= 0.1
+    time.sleep(6) # sleep 6 seconds
+    sad = getUserPlaylistID('Sad?')
+    if sad is False:
+        print('Unable to get playlist ID')
+        # return error
+        exit()
+    songsToAdd = []
+    for numbers in generated['Audio']['Valence']:
+        if numbers <= 0.1:
+            songsToAdd.extend(generated['Audio']['Valence'][numbers])
+    toAdd = divideList(songsToAdd, 100)
+    sp.user_playlist_replace_tracks(username, sad, []) # clears playlist
+    for songs in toAdd:
+        sp.user_playlist_add_tracks(username, sad, songs)
+    sp.user_playlist_change_details(username, sad, 
+                                    description = 'Valence < 0.20 -- Updated on {}'.format(dateToday))
+    # UPDATE Happy? >= 0.8
+    time.sleep(6) # sleep 6 seconds
+    happy = getUserPlaylistID('Happy?')
+    if happy is False:
+        print('Unable to get playlist ID')
+        # return error
+        exit()
+    songsToAdd = []
+    for numbers in generated['Audio']['Valence']:
+        if numbers >= 0.8:
+            songsToAdd.extend(generated['Audio']['Valence'][numbers])
+    toAdd = divideList(songsToAdd, 100)
+    sp.user_playlist_replace_tracks(username, happy, []) # clears playlist
+    for songs in toAdd:
+        sp.user_playlist_add_tracks(username, happy, songs)
+    sp.user_playlist_change_details(username, happy, 
+                                    description = 'Valence >= 0.8 -- Updated on {}'.format(dateToday))
+    
 # starts the program
 if __name__ == "__main__":
-    generated = get_generated_playlists()
-    # scuffed - just gonna hard code the playlists i wanna keep updating
-    today = date.today()
-    # dd/mm/YY
-    dateToday = today.strftime("%d/%m/%Y")
-    #update_basic_playlists(generated, dateToday)
-    update_characteristic_playlists(generated, dateToday)
     start()
 
 # some saved songs dont update - not in csv even after saving - have to unlike and then like again then save for it to update
