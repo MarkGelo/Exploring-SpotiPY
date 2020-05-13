@@ -5,3 +5,7 @@ To start the program, first populate the required components such as client id, 
 username,cid,secret,redirect_uri
 xxxxxxx,yyyyy,zzzzz,google.com
 ```
+Then run spotify.py and follow the instructions on the command line.\
+
+# AWS Lambda
+The script will run once a week and update certain playlists. The code is simple but all over the place because I was lazy at the time. Maybe I will organize it and make it beautiful in the future. It does what I want it to do, and at the time, that's all that I want. (05-13-2020)
