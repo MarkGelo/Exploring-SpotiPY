@@ -441,9 +441,164 @@ def playlistGenerator():
     for lists in addingSongs:
         sp.user_playlist_add_tracks(username, newPlaylistID, lists)
 
+def get_generated_playlists():
+    # gets saved songs, while also making list for the popularity and year playlists to update the playlists
+    saved = sp.current_user_saved_tracks()
+    generated = {"Year" : {}, "Genre" : {}, "Popularity" : {}, "Audio" : {}}
+    i = 0
+    savedSongs = []
+    while saved['total'] > i:
+        saved = sp.current_user_saved_tracks(offset = i) # limit max default 20 so need offset each time
+        for song in saved['items']:
+            savedSongs.append(song['track']['id'])
+            i += 1
+            # GET YEARS
+            year = 0 # unknown default if somehow couldnt parse or whatev
+            # parses release date and rounds down to 10s
+            if(song['track']['album']['release_date_precision'] == 'year'):
+                year = roundDownToTens(int(song['track']['album']['release_date']))
+            elif(song['track']['album']['release_date_precision'] == 'day' or song['track']['album']['release_date_precision'] == 'month'):
+                year = roundDownToTens(int(song['track']['album']['release_date'][:4])) # get first four characters, which is the year
+            
+            # adds to dict
+            if year in generated['Year']:
+                generated['Year'][year].append(song['track']['id'])
+            else:
+                generated['Year'][year] = [song['track']['id']]
+
+            # GET POPULARITY
+            pop = roundDownToTens(int(song['track']['popularity']))
+            # adds to dict
+            if pop in generated['Popularity']: # check if range of popularity is in dictionary already, ex 10s is 10 - 20 pop
+                generated['Popularity'][pop].append(song['track']['id']) # if its already there, appends to the current list
+            else: # if not , then makes one and with a list
+                generated['Popularity'][pop] = [song['track']['id']]
+            
+            # GET GENRE HOW THO
+            # ------------------------------------------------------
+
+    # GET AUDIO STATS
+    # https://developer.spotify.com/documentation/web-api/reference/tracks/get-audio-features/
+    characteristics = ['Acousticness', 'Danceability', 'Energy', 'Instrumentalness', 'Loudness', 'Valence', 'Tempo']
+    for characteristic in characteristics:
+        generated['Audio'][characteristic] = {} # adds another dict layer into dict
+    audioSongs = divideList(savedSongs, 100)
+    for listOfSongs in audioSongs:
+        temp1 = sp.audio_features(listOfSongs)
+        for song in temp1:
+            charVals = []
+            charVals.append(roundDown(song['acousticness'], 1))
+            charVals.append(roundDown(song['danceability'], 1))
+            charVals.append(roundDown(song['energy'], 1))
+            charVals.append(roundDown(song['instrumentalness'], 1))
+            charVals.append(roundDown(song['loudness'], 0))
+            charVals.append(roundDown(song['valence'], 1))
+            charVals.append(roundDown(song['tempo'], -1))
+            for i in range(0, len(characteristics)):
+                if charVals[i] in generated['Audio'][characteristics[i]]:
+                    generated['Audio'][characteristics[i]][charVals[i]].append(song['id'])
+                else:
+                    generated['Audio'][characteristics[i]][charVals[i]] = [song['id']]
+    return generated
+
+def update_basic_playlists(generated, dateToday): # only updates 60s - 00s and underrated and unknown
+    # UPDATE 60s
+    sixties = getUserPlaylistID('60s')
+    if(sixties is False):
+        print('Unable to get Playlist ID')
+        # should return error
+        exit()
+    # replace tracks with new list - if on there already, dont delete and add - adds new stuff tho
+    toAdd = divideList(generated['Year'][1960], 100) # max 100
+    sp.user_playlist_replace_tracks(username, sixties, []) # clears playlist
+    for songs in toAdd:
+        sp.user_playlist_add_tracks(username, sixties, songs)
+    # update description
+    sp.user_playlist_change_details(username, sixties, description = 'Updated on {}'.format(dateToday))
+    # UPDATE 70s
+    seventies = getUserPlaylistID('70s')
+    if seventies is False:
+        print('Unable to get playlist ID')
+        # should return an error
+        exit()
+    toAdd = divideList(generated['Year'][1970], 100)
+    sp.user_playlist_replace_tracks(username, seventies, []) # clears playlist
+    for songs in toAdd:
+        sp.user_playlist_add_tracks(username, seventies, songs)
+    sp.user_playlist_change_details(username, seventies, description = 'Updated on {}'.format(dateToday))
+    # UPDATE 80s
+    eighties = getUserPlaylistID('80s')
+    if eighties is False:
+        print('Unable to get playlist ID')
+        # return an error
+        exit()
+    toAdd = divideList(generated['Year'][1980], 100)
+    sp.user_playlist_replace_tracks(username, eighties, []) # clears playlist
+    for songs in toAdd:
+        sp.user_playlist_add_tracks(username, eighties, songs)
+    sp.user_playlist_change_details(username, eighties, description = 'Updated on {}'.format(dateToday))
+    # UPDATE 90s
+    nineties = getUserPlaylistID('90s')
+    if nineties is False:
+        print('Unable to get playlist ID')
+        # return an error
+        exit()
+    toAdd = divideList(generated['Year'][1990], 100)
+    sp.user_playlist_replace_tracks(username, nineties, []) # clears playlist
+    for songs in toAdd:
+        sp.user_playlist_add_tracks(username, nineties, songs)
+    sp.user_playlist_change_details(username, nineties, description = 'Updated on {}'.format(dateToday))
+    # UPDATE 00s
+    two = getUserPlaylistID('00s')
+    if two is False:
+        print('Unable to get playlist ID')
+        # return an error
+        exit()
+    toAdd = divideList(generated['Year'][2000], 100)
+    sp.user_playlist_replace_tracks(username, two, []) # clears playlist
+    for songs in toAdd:
+        sp.user_playlist_add_tracks(username, two, songs)
+    sp.user_playlist_change_details(username, two, description = 'Updated on {}'.format(dateToday))
+    # UPDATE Underrated? - popularities 10s and 20s
+    underrated = getUserPlaylistID('Underrated?')
+    if underrated is False:
+        print('Unable to get playlist ID')
+        # return an error
+        exit()
+    toAddSongs = generated['Popularity'][10]
+    toAddSongs.extend(generated['Popularity'][20])
+    toAddSongs.extend(generated['Popularity'][30])
+    toAdd = divideList(toAddSongs, 100)
+    sp.user_playlist_replace_tracks(username, underrated, []) # clears playlist
+    for songs in toAdd:
+        sp.user_playlist_add_tracks(username, underrated, songs)
+    sp.user_playlist_change_details(username, underrated, 
+                                    description = 'Spotify gives these a 10-39 on popularity -- Updated on {}'.format(dateToday))
+    # UPDATE Unknown?
+    unknown = getUserPlaylistID('Unknown?')
+    if unknown is False:
+        print('Unable to get playlist ID')
+        # return an error
+        exit()
+    toAdd = divideList(generated['Popularity'][0], 100) # only 0s, 0-9 popularity
+    sp.user_playlist_replace_tracks(username, unknown, []) # clears playlist
+    for songs in toAdd:
+        sp.user_playlist_add_tracks(username, unknown, songs)
+    sp.user_playlist_change_details(username, unknown, 
+                                    description = 'Spotify gives these a 0-9 on popularity -- Updated on {}'.format(dateToday))
+
+def update_characteristic_playlists(generated, dateToday):
+    pass
 
 # starts the program
 if __name__ == "__main__":
+    generated = get_generated_playlists()
+    # scuffed - just gonna hard code the playlists i wanna keep updating
+    today = date.today()
+    # dd/mm/YY
+    dateToday = today.strftime("%d/%m/%Y")
+    #update_basic_playlists(generated, dateToday)
+    update_characteristic_playlists(generated, dateToday)
     start()
 
 # some saved songs dont update - not in csv even after saving - have to unlike and then like again then save for it to update
