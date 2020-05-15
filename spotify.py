@@ -7,17 +7,19 @@ import spotipy.util as util
 import math
 from datetime import date
 import time
+import requests
 
 # auto populated if put into a csv file with these
 cid ='' # Client ID
 secret = '' # Client Secret
 username = '' # Spotify username
 redirect_uri='' # redirect url
-
+last_fm_api_key = '' # last fm api key
+USER_AGENT = "GenreGetter-geloprojects" # for last fm
 # get info needed from a text file
 # so more secure
 def getInfo(textFile):
-    global username, cid, secret, redirect_uri
+    global username, cid, secret, redirect_uri, last_fm_api_key
     with open(textFile, 'r') as file:
         reader = csv.DictReader(file)
         for row in reader:
@@ -25,6 +27,7 @@ def getInfo(textFile):
             cid = row['cid']
             secret = row['secret']
             redirect_uri = row['redirect_uri']
+            last_fm_api_key = row['last_fm_api_key']
             return
 
 # reads text file with the info and populates the variables needed
@@ -296,71 +299,14 @@ def roundDown(n, decimals = 0): # decimals is where to round down to, if 0, then
     return math.floor(n * multiplier) / multiplier
 
 def playlistGenerator():
-    generated = {"Year" : {}, "Genre" : {}, "Popularity" : {}, "Audio" : {}}
     description = []
-    savedSongs = savedToList() # put all ids of saved songs in this var
-
-    songs = divideList(savedSongs, 50) # 50 max ids
-    for listsOfSongs in songs:
-        temp1 = sp.tracks(listsOfSongs) # temp var of tracks
-        for track in temp1['tracks']:
-            # GET YEARS
-            year = 0 # unknown default if somehow couldnt parse or whatev
-            # parses release date and rounds down to 10s
-            if(track['album']['release_date_precision'] == 'year'):
-                year = roundDownToTens(int(track['album']['release_date']))
-            elif(track['album']['release_date_precision'] == 'day' or track['album']['release_date_precision'] == 'month'):
-                year = roundDownToTens(int(track['album']['release_date'][:4])) # get first four characters, which is the year
-            
-            # adds to dict
-            if year in generated['Year']:
-                generated['Year'][year].append(track['id'])
-            else:
-                generated['Year'][year] = [track['id']]
-
-            # GET POPULARITY
-            pop = roundDownToTens(int(track['popularity']))
-            # adds to dict
-            if pop in generated['Popularity']: # check if range of popularity is in dictionary already, ex 10s is 10 - 20 pop
-                generated['Popularity'][pop].append(track['id']) # if its already there, appends to the current list
-            else: # if not , then makes one and with a list
-                generated['Popularity'][pop] = [track['id']]
-            
-            # GET GENRE
-            # but how tho
-            # web scraping? 
-            # or machine learning pogu but have to scrape for audio lmao or could use spotifys api full audio analysis to learn from
-            # https://towardsdatascience.com/music-genre-prediction-with-spotifys-audio-features-8a2c81f1a22e
-    
-    # GET AUDIO STATS
-    # https://developer.spotify.com/documentation/web-api/reference/tracks/get-audio-features/
-    characteristics = ['Acousticness', 'Danceability', 'Energy', 'Instrumentalness', 'Loudness', 'Valence', 'Tempo']
-    for characteristic in characteristics:
-        generated['Audio'][characteristic] = {} # adds another dict layer into dict
-    audioSongs = divideList(savedSongs, 100)
-    for listOfSongs in audioSongs:
-        temp1 = sp.audio_features(listOfSongs)
-        for song in temp1:
-            charVals = []
-            charVals.append(roundDown(song['acousticness'], 1))
-            charVals.append(roundDown(song['danceability'], 1))
-            charVals.append(roundDown(song['energy'], 1))
-            charVals.append(roundDown(song['instrumentalness'], 1))
-            charVals.append(roundDown(song['loudness'], 0))
-            charVals.append(roundDown(song['valence'], 1))
-            charVals.append(roundDown(song['tempo'], -1))
-            for i in range(0, len(characteristics)):
-                if charVals[i] in generated['Audio'][characteristics[i]]:
-                    generated['Audio'][characteristics[i]][charVals[i]].append(song['id'])
-                else:
-                    generated['Audio'][characteristics[i]][charVals[i]] = [song['id']]
-
+    generated = get_generated_playlists()
     # iterate over dictionary and checking lengths of lists and display to user
     for types in generated:
         print('{}: '.format(types))
         for subCat in generated[types]:
             # take out categories that dont have 50+ or more songs
-            if isinstance(subCat, str):
+            if isinstance(subCat, str) and not isinstance(generated[types][subCat], list):
                 print('\t{}:'.format(subCat))
                 for subCat1 in generated[types][subCat]:
                     amtOfSongs = len(generated[types][subCat][subCat1])
@@ -442,6 +388,28 @@ def playlistGenerator():
     for lists in addingSongs:
         sp.user_playlist_add_tracks(username, newPlaylistID, lists)
 
+def get_genre(id, songName, artist):
+    time.sleep(1)
+    fmheaders = {"user-agent" : last_fm_api_key}
+    fmpayload = {
+    'api_key': last_fm_api_key,
+    'method': 'track.getTopTags',
+    'track' : songName,
+    'artist' : artist,
+    'format': 'json'
+    }
+    genres = []
+    r = requests.get('http://ws.audioscrobbler.com/2.0/', headers=fmheaders, params=fmpayload)
+    data = r.json()
+    try:
+        tags = data['toptags']['tag']
+        # get top 5 tags
+        for i in range(0, 5):
+            genres.append(tags[i]['name'].lower())
+    except: # error in finding the track
+        pass # nothing so returns an empty list
+    return genres
+
 def get_generated_playlists():
     # gets saved songs, while also making list for the popularity and year playlists to update the playlists
     saved = sp.current_user_saved_tracks()
@@ -452,6 +420,16 @@ def get_generated_playlists():
         saved = sp.current_user_saved_tracks(offset = i) # limit max default 20 so need offset each time
         for song in saved['items']:
             savedSongs.append(song['track']['id'])
+            # GET GENRE
+            songName = song['track']['name']
+            songArtist = song['track']['artists'][0]['name'] # get first artist
+            genres = get_genre(song['track']['id'], songName, songArtist)
+            for genre in genres:
+                # adds to dict
+                if genre in generated['Genre']:
+                    generated['Genre'][genre].append(song['track']['id'])
+                else:
+                    generated['Genre'][genre] = [song['track']['id']]
             i += 1
             # GET YEARS
             year = 0 # unknown default if somehow couldnt parse or whatev
@@ -460,7 +438,6 @@ def get_generated_playlists():
                 year = roundDownToTens(int(song['track']['album']['release_date']))
             elif(song['track']['album']['release_date_precision'] == 'day' or song['track']['album']['release_date_precision'] == 'month'):
                 year = roundDownToTens(int(song['track']['album']['release_date'][:4])) # get first four characters, which is the year
-            
             # adds to dict
             if year in generated['Year']:
                 generated['Year'][year].append(song['track']['id'])
@@ -474,10 +451,6 @@ def get_generated_playlists():
                 generated['Popularity'][pop].append(song['track']['id']) # if its already there, appends to the current list
             else: # if not , then makes one and with a list
                 generated['Popularity'][pop] = [song['track']['id']]
-            
-            # GET GENRE HOW THO
-            # ------------------------------------------------------
-
     # GET AUDIO STATS
     # https://developer.spotify.com/documentation/web-api/reference/tracks/get-audio-features/
     characteristics = ['Acousticness', 'Danceability', 'Energy', 'Instrumentalness', 'Loudness', 'Valence', 'Tempo']
@@ -734,6 +707,12 @@ def update_characteristic_playlists(generated, dateToday):
     
 # starts the program
 if __name__ == "__main__":
+    # playlist generator is inefficient because finds genre each time it is run
+    # so uses lastfm api each time for like all saved songs, in my case 1.6k + songs each time
+    # inefficient, should instead save all the outut id and genres into a csv
+    # then have it cross reference if in the csv file, if so dont search for a genre
+    # takes a while too, because dont wanna reach api rate limit, so 1 second each call --- 1.6+ seconds lmao
+    # ill fix later when i feel like it, lambda function in AWS works tho, efficiently
     start()
 
 # some saved songs dont update - not in csv even after saving - have to unlike and then like again then save for it to update
