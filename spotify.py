@@ -8,6 +8,7 @@ import math
 from datetime import date
 import time
 import requests
+from csv import DictWriter
 
 # auto populated if put into a csv file with these
 cid ='' # Client ID
@@ -54,6 +55,15 @@ if token:
     sp = spotipy.Spotify(auth=token)
 else:
     print("Can't get token for", username)
+
+# read file to get genres of ids
+def get_saved_genres_of_saved_songs():
+    genreSavedSongs = {} # id : genres
+    with open('savedSongsGenre.csv', 'r') as file:
+        reader = csv.DictReader(file)
+        for row in reader: #input into dictionary
+            genreSavedSongs[row['id']] = row['genres'].split('//')
+    return genreSavedSongs
 
 # checks if the id in parameter is in saved songs csv
 def inSaved(id):
@@ -388,7 +398,11 @@ def playlistGenerator():
     for lists in addingSongs:
         sp.user_playlist_add_tracks(username, newPlaylistID, lists)
 
-def get_genre(id, songName, artist):
+def get_genre(id, songName, artist, saved):
+    # check if already saved/checked for a genre, then just get it if so
+    if id in saved:
+        return saved[id]
+    print('Searched Last.fm for genres of {}'.format(songName))
     time.sleep(1)
     fmheaders = {"user-agent" : last_fm_api_key}
     fmpayload = {
@@ -406,13 +420,16 @@ def get_genre(id, songName, artist):
         # get top 5 tags
         for i in range(0, 5):
             genres.append(tags[i]['name'].lower())
-    except: # error in finding the track
-        pass # nothing so returns an empty list
+        save_album_data(id, genres)
+    except: # error in finding the track, saves genre as NotFound
+        genres.append(['NotFound'])
+        save_album_data(id, ['NotFound'])
     return genres
 
 def get_generated_playlists():
     # gets saved songs, while also making list for the popularity and year playlists to update the playlists
     saved = sp.current_user_saved_tracks()
+    genreSavedSongs = get_saved_genres_of_saved_songs()
     generated = {"Year" : {}, "Genre" : {}, "Popularity" : {}, "Audio" : {}}
     i = 0
     savedSongs = []
@@ -423,7 +440,7 @@ def get_generated_playlists():
             # GET GENRE
             songName = song['track']['name']
             songArtist = song['track']['artists'][0]['name'] # get first artist
-            genres = get_genre(song['track']['id'], songName, songArtist)
+            genres = get_genre(song['track']['id'], songName, songArtist, genreSavedSongs)
             for genre in genres:
                 # adds to dict
                 if genre in generated['Genre']:
@@ -704,15 +721,17 @@ def update_characteristic_playlists(generated, dateToday):
         sp.user_playlist_add_tracks(username, happy, songs)
     sp.user_playlist_change_details(username, happy, 
                                     description = 'Valence >= 0.8 -- Updated on {}'.format(dateToday))
-    
+
+def save_album_data(id, genres):
+    # Open file in append mode
+    with open('savedSongsGenre.csv', 'a+', newline='') as write_obj:
+        # Create a writer object from csv module
+        dict_writer = DictWriter(write_obj, fieldnames=['id', 'genres'])
+        # Add dictionary as wor in the csv
+        dict_writer.writerow({'id': id, 'genres': '//'.join(genres)})
+
 # starts the program
 if __name__ == "__main__":
-    # playlist generator is inefficient because finds genre each time it is run
-    # so uses lastfm api each time for like all saved songs, in my case 1.6k + songs each time
-    # inefficient, should instead save all the outut id and genres into a csv
-    # then have it cross reference if in the csv file, if so dont search for a genre
-    # takes a while too, because dont wanna reach api rate limit, so 1 second each call --- 1.6+ seconds lmao
-    # ill fix later when i feel like it, lambda function in AWS works tho, efficiently
     start()
 
 # some saved songs dont update - not in csv even after saving - have to unlike and then like again then save for it to update
