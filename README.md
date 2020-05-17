@@ -14,6 +14,6 @@ The script will run once a week and update certain playlists. The playlists to b
 # Set up in AWS Lambda
 Set up the dynamodb tables called Spotify and SpotifyGenre. Spotify table has user and accessKey. SpotifyGenre table has songID and genres (stringSet).\
 Insert the lambda_function.py and all the relevant dependencies in one folder and then zip. Import the zip to a function in AWS Lambda.\
-Set the environment variables (spotify cid, redirect_uri, refresh_token, secret, username, and also Last.fm api key)
-Add a trigger for the function (CloudWatch Events for timers such as every week)
+Set the environment variables (spotify cid, redirect_uri, refresh_token, secret, username, and also Last.fm api key)\
+Add a trigger for the function (CloudWatch Events for timers such as every week)\
 Optional - Add a destination such as Amazon SNS to email you on success/failure of the function
