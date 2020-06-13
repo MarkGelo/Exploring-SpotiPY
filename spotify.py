@@ -732,7 +732,8 @@ def save_album_data(id, genres):
 
 # starts the program
 if __name__ == "__main__":
-    start()
+    #start()
+    print('test')
 
 # some saved songs dont update - not in csv even after saving - have to unlike and then like again then save for it to update
 # SOME SONGS ARE UNAVAILABLE, gREYED OUT ON SPOTIFY, NOT AVAILABLE IN US?? IS THAT WHY NOT ALL SONGS GET SAVED TO A PLAYLIST OR WHATEV??
